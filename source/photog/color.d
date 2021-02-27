@@ -135,20 +135,20 @@ do
         output = uninitSlice!ReturnType(input.shape);
 
     // dfmt off
-	output[] = input
-		// convert input array elements
-		.as!ReturnType
-		// normalize pixel channels to range [0, 1]
-		.map!(chnl => chnl / InputType.max)
-		// sRGB inverse compand (linearize with respect to energy)
-		.map!(chnl => chnl <= 0.04045 ? chnl / 12.92 : ((chnl + 0.055) / 1.055) ^^ 2.4)
-		// linear RGB to XYZ
-		// iterator by m and n over pixels (3rd dimension)
-		.byDim!(0, 1)
-		// dot product of each pixel with conversion matrix
-		.map!(pixel => mtimes(convMatrix, pixel))
-		// join iterator values into a matrix
-		.fuse;
+    output[] = input
+        // convert input array elements
+        .as!ReturnType
+        // normalize pixel channels to range [0, 1]
+        .map!(chnl => chnl / InputType.max)
+        // sRGB inverse compand (linearize with respect to energy)
+        .map!(chnl => chnl <= 0.04045 ? chnl / 12.92 : ((chnl + 0.055) / 1.055) ^^ 2.4)
+        // linear RGB to XYZ
+        // iterator by m and n over pixels (3rd dimension)
+        .byDim!(0, 1)
+        // dot product of each pixel with conversion matrix
+        .map!(pixel => mtimes(convMatrix, pixel))
+        // join iterator values into a matrix
+        .fuse;
     // dfmt on
 
     return output;
