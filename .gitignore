@@ -1,3 +1,13 @@
+# Project output
+bin/
+/photog
+photog.so
+photog.dylib
+photog.dll
+photog.a
+photog.lib
+photog-test-*
+
 # Compiled Object files
 *.o
 *.obj
