@@ -1,3 +1,13 @@
+# Project output
+bin/
+/color-playground
+color-playground.so
+color-playground.dylib
+color-playground.dll
+color-playground.a
+color-playground.lib
+color-playground-test-*
+
 # Compiled Object files
 *.o
 *.obj
