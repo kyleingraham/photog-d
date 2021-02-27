@@ -1,13 +1,13 @@
 module photog.color;
 
-import mir.ndslice: Slice, sliced;
+import mir.ndslice : Slice, sliced;
 
 /**
 RGB working spaces.
 */
 enum WorkingSpace
 {
-	sRgb = "sRgb"
+    sRgb = "sRgb"
 }
 
 /**
@@ -15,9 +15,13 @@ Color space conversion matrices.
 */
 private static immutable
 {
-	auto sRgbRgb2Xyz = [0.4124564,  0.3575761,  0.1804375,
-				    	0.2126729,  0.7151522,  0.0721750,
- 				    	0.0193339,  0.1191920,  0.9503041];
+    // dfmt off
+    auto sRgbRgb2Xyz = [
+        0.4124564, 0.3575761, 0.1804375,
+        0.2126729, 0.7151522, 0.0721750,
+        0.0193339, 0.1191920, 0.9503041
+    ];
+    // dfmt on
 }
 
 /**
@@ -32,26 +36,34 @@ Params:
 Returns:
 	Returns XYZ version of the RGB input image.
 */
-Slice!(ReturnType*, 3) rgb2Xyz(WorkingSpace workingSpace = WorkingSpace.sRgb, ReturnType = double, InputType) (Slice!(InputType*, 3) input, Slice!(ReturnType*, 3) output = Slice!(ReturnType*, 3)())
+Slice!(ReturnType*, 3) rgb2Xyz(WorkingSpace workingSpace = WorkingSpace.sRgb,
+        ReturnType = double, InputType)(Slice!(InputType*, 3) input,
+        Slice!(ReturnType*, 3) output = Slice!(ReturnType*, 3)())
 {
-	return rgbBgr2Xyz!(false, workingSpace, ReturnType, InputType)(input, output);
+    return rgbBgr2Xyz!(false, workingSpace, ReturnType, InputType)(input, output);
 }
 
 unittest
 {
-	import std.math : approxEqual;
+    import std.math : approxEqual;
 
-	ubyte[] rgb = [255, 0, 0,
-	 			   0, 255, 0,
-	  			   0, 0, 255,
-	   			   120, 120, 120];
+    // dfmt off
+    ubyte[] rgb = [
+        255, 0, 0,
+        0, 255, 0,
+        0, 0, 255,
+        120, 120, 120
+    ];
 
-	Slice!(double*, 3) xyz = [0.412456, 0.212673, 0.019334,
-			    			  0.357576, 0.715152, 0.119192, 
-			    			  0.180438, 0.072175, 0.950304, 
-			    			  0.178518, 0.187821, 0.204505].sliced(4, 1, 3);
+    Slice!(double*, 3) xyz = [
+        0.412456, 0.212673, 0.019334,
+        0.357576, 0.715152, 0.119192,
+        0.180438, 0.072175, 0.950304,
+        0.178518, 0.187821, 0.204505
+    ].sliced(4, 1, 3);
+    // dfmt on
 
-	assert(approxEqual(rgb.sliced(4, 1, 3).rgb2Xyz, xyz));
+    assert(approxEqual(rgb.sliced(4, 1, 3).rgb2Xyz, xyz));
 }
 
 /**
@@ -66,53 +78,63 @@ Params:
 Returns:
 	Returns XYZ version of the BGR input image.
 */
-Slice!(ReturnType*, 3) bgr2Xyz(WorkingSpace workingSpace = WorkingSpace.sRgb, ReturnType = double, InputType) (Slice!(InputType*, 3) input, Slice!(ReturnType*, 3) output = Slice!(ReturnType*, 3)())
+Slice!(ReturnType*, 3) bgr2Xyz(WorkingSpace workingSpace = WorkingSpace.sRgb,
+        ReturnType = double, InputType)(Slice!(InputType*, 3) input,
+        Slice!(ReturnType*, 3) output = Slice!(ReturnType*, 3)())
 {
-	return rgbBgr2Xyz!(true, workingSpace, ReturnType, InputType)(input, output);
+    return rgbBgr2Xyz!(true, workingSpace, ReturnType, InputType)(input, output);
 }
 
 unittest
 {
-	import std.math : approxEqual;
+    import std.math : approxEqual;
 
-	ubyte[] bgr = [0, 0, 255,
-	 			   0, 255, 0,
-	  			   255, 0, 0,
-	   			   120, 120, 120];
+    // dfmt off
+    ubyte[] bgr = [
+        0, 0, 255,
+        0, 255, 0,
+        255, 0, 0,
+        120, 120, 120
+    ];
 
-	Slice!(double*, 3) xyz = [0.412456, 0.212673, 0.019334,
-			    			  0.357576, 0.715152, 0.119192, 
-			    			  0.180438, 0.072175, 0.950304, 
-			    			  0.178518, 0.187821, 0.204505].sliced(4, 1, 3);
+    Slice!(double*, 3) xyz = [
+        0.412456, 0.212673, 0.019334,
+        0.357576, 0.715152, 0.119192,
+        0.180438, 0.072175, 0.950304,
+        0.178518, 0.187821, 0.204505
+    ].sliced(4, 1, 3);
+    // dfmt on
 
-	assert(approxEqual(bgr.sliced(4, 1, 3).bgr2Xyz, xyz));
+    assert(approxEqual(bgr.sliced(4, 1, 3).bgr2Xyz, xyz));
 }
 
-private Slice!(ReturnType*, 3) rgbBgr2Xyz(bool isBgr, WorkingSpace workingSpace, ReturnType, InputType) (Slice!(InputType*, 3) input, Slice!(ReturnType*, 3) output)
+private Slice!(ReturnType*, 3) rgbBgr2Xyz(bool isBgr, WorkingSpace workingSpace,
+        ReturnType, InputType)(Slice!(InputType*, 3) input, Slice!(ReturnType*, 3) output)
 in
 {
-	import std.traits: isFloatingPoint;
+    import std.traits : isFloatingPoint;
 
-	static assert(isFloatingPoint!ReturnType, "Return type must be floating point.");
-	assert(input.shape[2] == 3, "Input requires 3 channels.");
+    static assert(isFloatingPoint!ReturnType, "Return type must be floating point.");
+    assert(input.shape[2] == 3, "Input requires 3 channels.");
 }
 do
 {
-	import kaleidic.lubeck: mtimes;
-	import mir.ndslice: as, byDim, fuse, map, reversed, uninitSlice;
+    import kaleidic.lubeck : mtimes;
+    import mir.ndslice : as, byDim, fuse, map, reversed, uninitSlice;
 
-	static if (isBgr)
-	{	
-		auto convMatrix = mixin(workingSpace ~ "Rgb2Xyz").sliced(3, 3).reversed!1;
-	}
-	else
-	{
-		auto convMatrix = mixin(workingSpace ~ "Rgb2Xyz").sliced(3, 3);
-	}
-	
-	if (input.shape != output.shape)
-		output = uninitSlice!ReturnType(input.shape);
+    static if (isBgr)
+    {
+        auto convMatrix = mixin(workingSpace ~ "Rgb2Xyz").sliced(3, 3).reversed!1;
+    }
+    else
+    {
+        auto convMatrix = mixin(workingSpace ~ "Rgb2Xyz").sliced(3, 3);
+    }
 
+    if (input.shape != output.shape)
+        output = uninitSlice!ReturnType(input.shape);
+
+    // dfmt off
 	output[] = input
 		// convert input array elements
 		.as!ReturnType
@@ -127,6 +149,7 @@ do
 		.map!(pixel => mtimes(convMatrix, pixel))
 		// join iterator values into a matrix
 		.fuse;
+    // dfmt on
 
-	return output;
+    return output;
 }
