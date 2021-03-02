@@ -112,9 +112,10 @@ private Slice!(ReturnType*, 3) rgbBgr2Xyz(bool isBgr, WorkingSpace workingSpace,
         ReturnType, InputType)(Slice!(InputType*, 3) input, Slice!(ReturnType*, 3) output)
 in
 {
-    import std.traits : isFloatingPoint;
+    import std.traits : isFloatingPoint, isUnsigned;
 
     static assert(isFloatingPoint!ReturnType, "Return type must be floating point.");
+    static assert(isUnsigned!InputType, "Input type must be unsigned.");
     assert(input.shape[2] == 3, "Input requires 3 channels.");
 }
 do
