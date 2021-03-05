@@ -115,7 +115,9 @@ in
     import std.traits : isFloatingPoint, isUnsigned;
 
     static assert(isFloatingPoint!ReturnType, "Return type must be floating point.");
-    static assert(isUnsigned!InputType, "Input type must be unsigned.");
+    // This can't work. I need to be able to pass in floating point numbers.
+    // Use runtime assert that all pixel channels are positive?
+    //static assert(isUnsigned!InputType, "Input type must be unsigned.");
     assert(input.shape[2] == 3, "Input requires 3 channels.");
 }
 do
@@ -140,7 +142,7 @@ do
         // convert input array elements
         .as!ReturnType
         // normalize pixel channels to range [0, 1]
-        .map!(chnl => chnl / InputType.max)
+        .map!(chnl => chnl / InputType.max) // This doesn't work when channel value isn't scaled to containter type bounds.
         // sRGB inverse compand (linearize with respect to energy)
         .map!(chnl => chnl <= 0.04045 ? chnl / 12.92 : ((chnl + 0.055) / 1.055) ^^ 2.4)
         // linear RGB to XYZ
