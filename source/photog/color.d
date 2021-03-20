@@ -1,5 +1,6 @@
 module photog.color;
 
+import ldc.attributes : fastmath;
 import mir.ndslice : Slice, sliced;
 
 /**
@@ -334,4 +335,266 @@ unittest
 	size_t[3] expectedDims = [1, 2, 3];
 	auto a = slice!double(expectedDims, 0);
 	assert(a.dimensions == expectedDims);
+}
+
+/**
+Calculates the mean pixel value for an image.
+
+Return semantics match mir.math.stat.mean.
+*/
+auto imageMean(Iterator)(Slice!(Iterator, 3) image)
+in
+{
+    assert(image.shape[2] == 3, "Input requires 3 channels.");
+}
+do
+{
+    import mir.math.stat : mean;
+    import mir.ndslice : byDim, map, slice;
+
+    // TODO: Add option for segmenting image for calculating mean.
+    // TODO: Add option to exclude top and bottom percentiles from mean.
+    // dfmt off
+    return image
+        .byDim!2
+        .map!(mean)
+        .slice;
+    //dfmt on
+}
+
+unittest
+{
+    // dfmt off
+    ubyte[] rgb = [
+        255, 0, 0,
+        0, 255, 0,
+        0, 0, 255,
+        120, 120, 120
+    ];
+    //dfmt on
+
+    assert(rgb.sliced(4, 1, 3).imageMean == [93.75, 93.75, 93.75]);
+}
+
+Slice!(ReturnType*, dims) toUnsigned(ReturnType = ubyte, InputType, size_t dims)(Slice!(InputType*, dims) image)
+in
+{
+    import std.traits : isFloatingPoint, isUnsigned;
+
+    static assert(isFloatingPoint!InputType);
+    static assert(isUnsigned!ReturnType);
+}
+do
+{
+    // TODO: Handle being passed an unsigned slice.
+    import mir.ndslice : each, uninitSlice, zip;
+
+    auto output = uninitSlice!ReturnType(image.shape);
+    auto zipped = zip(image, output);
+    zipped.each!((z) { toUnsignedImpl(z); });
+
+    return output;
+}
+
+void toUnsignedImpl(T)(T zippedChnls)
+{
+    import std.math : round;
+    
+    alias UnsignedType = typeof(zippedChnls[1].__value());
+    zippedChnls[1].__value() = cast(UnsignedType) round(zippedChnls[0].__value().clip!(0, 1) * UnsignedType.max);
+}
+
+unittest
+{
+    import std.math : approxEqual;
+    import mir.ndslice : sliced;
+
+    // dfmt off
+    Slice!(double*, 3) rgb = [
+        1.0, 0.0, 0.0,
+        0.0, 1.0, 0.0,
+        0.0, 0.0, 1.0,
+        0.470588, 0.470588, 0.470588
+    ].sliced(4, 1, 3);
+
+    ubyte[] rgbU = [
+        255, 0, 0,
+        0, 255, 0,
+        0, 0, 255,
+        120, 120, 120
+    ];
+    Slice!(ubyte*, 3) rgbUnsigned = rgbU.sliced(4, 1, 3);
+    //dfmt on
+
+    assert(approxEqual(rgb.toUnsigned, rgbUnsigned));
+}
+
+Slice!(ReturnType*, 3) toFloating(ReturnType = double, InputType)(InputType[] image, uint width, uint height)
+in
+{
+    import std.traits : isFloatingPoint, isUnsigned;
+
+    static assert(isFloatingPoint!ReturnType);
+    static assert(isUnsigned!InputType);
+}
+do
+{
+    import mir.ndslice : each, uninitSlice, zip;
+
+    auto output = uninitSlice!ReturnType([height, width, 3]);
+    auto zipped = zip(image.sliced(height, width, 3), output);
+    zipped.each!((z) { toFloatingImpl(z); });
+
+    return output;
+}
+
+@fastmath
+private void toFloatingImpl(T)(T zippedChnls)
+{
+    alias UnsignedType = typeof(zippedChnls[0].__value());
+    alias FloatingType = typeof(zippedChnls[1].__value());
+    zippedChnls[1].__value() = cast(FloatingType) zippedChnls[0] / UnsignedType.max;
+}
+
+unittest
+{
+    import std.math : approxEqual;
+
+    // dfmt off
+    ubyte[] rgb = [
+        255, 0, 0,
+        0, 255, 0,
+        0, 0, 255,
+        120, 120, 120
+    ];
+
+    Slice!(double*, 3) rgbDouble = [
+        1.0, 0.0, 0.0,
+        0.0, 1.0, 0.0,
+        0.0, 0.0, 1.0,
+        0.470588, 0.470588, 0.470588
+    ].sliced(4, 1, 3);
+    //dfmt on
+
+    assert(approxEqual(rgb.toFloating(1, 4), rgbDouble));
+}
+
+/**
+Standard illuminants.
+*/
+enum Illuminant
+{
+    d65 = [0.95047, 1.0, 1.08883]
+}
+
+enum ChromAdaptMethod
+{
+    bradford = "bradford"
+}
+
+private static immutable
+{
+    // dfmt off
+    auto bradfordXyz2Lms = [
+        0.8951, 0.2664, -0.1614,
+        -0.7502, 1.7135, 0.0367,
+        0.0389, -0.0685, 1.0296
+    ];
+    
+    auto bradfordInvXyz2Lms = [
+        0.9869929, -0.1470543, 0.1599627,
+        0.4323053, 0.5183603, 0.0492912,
+        -0.0085287, 0.0400428, 0.9684867
+    ];
+    // dfmt on
+}
+
+auto pixelMap(alias fun, Iterator)(Slice!(Iterator, 3) image)
+{
+    import mir.ndslice : fuse, map, pack;
+
+    return image
+        .pack!1
+        .map!(fun)
+        .fuse;
+}
+
+/**
+Inputs:
+    RGB source image (double)
+    XYZ white point of source image under source illuminant -> array to allow non-standard illuminants
+    XYZ white point of destination illuminant -> array to support wide range of possible source illuminants
+    working space
+
+    is it pure if I pass in arrays?
+*/
+Slice!(Iterator, 3) chromAdapt(ChromAdaptMethod method = ChromAdaptMethod.bradford, Iterator)(Slice!(Iterator, 3) image, double[] srcIlluminant, double[] destIlluminant, WorkingSpace workingSpace = WorkingSpace.sRgb)
+in
+{
+    import std.traits : isFloatingPoint;
+    
+    static assert(isFloatingPoint!(IteratorType!Iterator), "Image values must be floating point.");
+    assert(srcIlluminant.length == 3);
+    assert(destIlluminant.length == 3);
+}
+do
+{
+    import kaleidic.lubeck : mtimes;
+    import mir.ndslice : diagonal, reshape, slice;
+
+    auto xyz2Lms = mixin(method ~ "Xyz2Lms");
+    auto lms2Xyz = mixin(method ~ "InvXyz2Lms");
+
+    auto lmsSrc = xyz2Lms
+        .sliced(3, 3)
+        .mtimes(srcIlluminant.sliced(3, 1));
+    
+
+    auto lmsDest = xyz2Lms
+        .sliced(3, 3)
+        .mtimes(destIlluminant.sliced(3, 1));
+    
+
+    int err;
+    auto lmsGain = slice!double([3, 3], 0); 
+    auto diag = lmsGain.diagonal;
+    diag[] = (lmsDest / lmsSrc).reshape([3], err);
+    assert(err == 0);
+
+    auto transform = lms2Xyz
+        .sliced(3, 3)
+        .mtimes(lmsGain)
+        .mtimes(xyz2Lms.sliced(3, 3));
+
+    return image
+        .rgb2Xyz
+        .pixelMap!(pixel => transform.mtimes(pixel))
+        .xyz2Rgb;
+}
+
+unittest
+{
+    import mir.ndslice : reshape, slice;
+
+    // dfmt off
+    ubyte[] uImage = [
+        255, 0, 0,
+        0, 255, 0,
+        0, 0, 255,
+        120, 120, 120
+    ];
+
+    auto image = uImage.toFloating(1, 4);
+
+    int err;
+    double[] srcIlluminant = image
+        .imageMean
+        .reshape([1, 1, 3], err) // TODO: Get rid of the need for reshaping.
+        .rgb2Xyz
+        .field;
+    assert(err == 0);
+    //dfmt on
+    
+    auto ca = chromAdapt(image, srcIlluminant, Illuminant.d65);
+    // TODO: Add assertion on chromAdapt output.
 }
