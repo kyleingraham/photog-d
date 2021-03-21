@@ -1,7 +1,7 @@
 module photog.color;
 
 import ldc.attributes : fastmath;
-import mir.ndslice : Slice, sliced;
+import mir.ndslice : Slice, sliced, SliceKind;
 
 /**
 RGB working spaces.
@@ -208,6 +208,72 @@ unittest
     assert(approxEqual(xyz.xyz2Bgr, bgr, 0.01, 1e-04));
 }
 
+/**
+Convert [M, N, P] slice to [MxN] slice of [P] arrays.
+*/
+auto pixelPack(size_t chnls, InputType, size_t dims, SliceKind kind)(Slice!(InputType*, dims, kind) image)
+in
+{
+    assert(dims == 3, "Image must have 3 dimensions.");
+}
+do
+{
+    // TODO: How to we specify strides? e.g. Slice!(ReturnType*, 1, kind)(shape, strides, iterator);
+    size_t[1] shape = [image.shape[0] * image.shape[1]];
+    alias ReturnType = InputType[chnls];
+    ReturnType* iterator = cast(ReturnType*) image.iterator;
+    return Slice!(ReturnType*, 1, kind)(shape, iterator);
+}
+
+unittest
+{
+    // dfmt off
+    Slice!(double*, 3) rgb = [
+        1.0, 0.0, 0.0,
+        0.0, 1.0, 0.0,
+        0.0, 0.0, 1.0,
+        0.470588, 0.470588, 0.470588
+    ].sliced(4, 1, 3);
+    // dfmt on
+
+    auto packed = pixelPack!3(rgb);
+    assert(packed.shape == [4 * 1]);
+    assert(packed[0].length == 3);
+}
+
+/**
+Convert [MxN] slice of [P] arrays to [M, N, P] slice.
+*/
+auto pixelUnpack(size_t chnls, InputType, size_t dims, SliceKind kind)(Slice!(InputType*, dims, kind) image, size_t height, size_t width)
+in
+{
+    // TODO: Validate chnls * width * height == # of elements in array underlying image slice.
+    assert(dims == 1, "Image must have 1 dimension.");
+}
+do
+{
+    size_t[3] shape = [height, width, chnls];
+    alias ReturnType = IteratorType!InputType;
+    ReturnType* iterator = cast(ReturnType*) image.iterator;
+    return Slice!(ReturnType*, 3, kind)(shape, iterator);
+}
+
+unittest
+{
+    // dfmt off
+    Slice!(double[]*, 1) rgb = [
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [0.0, 0.0, 1.0],
+        [0.470588, 0.470588, 0.470588]
+    ].sliced(4);
+    // dfmt on
+
+    auto unpacked = pixelUnpack!3(rgb, 4, 1);
+    assert(unpacked.shape == [4, 1, 3]);
+    assert(unpacked[0][0].length == 3);
+}
+
 private Slice!(ReturnType*, 3) xyz2RgbBgr(bool isBgr, WorkingSpace workingSpace, ReturnType, Iterator)(Slice!(Iterator, 3) input)
 in
 {
@@ -396,6 +462,7 @@ do
     return output;
 }
 
+@fastmath
 void toUnsignedImpl(T)(T zippedChnls)
 {
     import std.math : round;
