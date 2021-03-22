@@ -153,7 +153,7 @@ do
     return output;
 }
 
-Slice!(ReturnType*, 3) xyz2Rgb(WorkingSpace workingSpace = WorkingSpace.sRgb, ReturnType = double, Iterator)(Slice!(Iterator, 3) input)
+Slice!(ReturnType*, 3) xyz2Rgb(WorkingSpace workingSpace = WorkingSpace.sRgb, ReturnType = double, T)(Slice!(T, 3) input)
 {
     return xyz2RgbBgr!(false, workingSpace, ReturnType)(input);
 }
@@ -181,7 +181,7 @@ unittest
     assert(approxEqual(xyz.xyz2Rgb, rgb, 0.01, 1e-04));
 }
 
-Slice!(ReturnType*, 3) xyz2Bgr(WorkingSpace workingSpace = WorkingSpace.sRgb, ReturnType = double, Iterator)(Slice!(Iterator, 3) input)
+Slice!(ReturnType*, 3) xyz2Bgr(WorkingSpace workingSpace = WorkingSpace.sRgb, ReturnType = double, T)(Slice!(T, 3) input)
 {
     return xyz2RgbBgr!(true, workingSpace, ReturnType)(input);
 }
@@ -205,6 +205,7 @@ unittest
         0.178518, 0.187821, 0.204505
     ].sliced(4, 1, 3);
     // dfmt on
+
     assert(approxEqual(xyz.xyz2Bgr, bgr, 0.01, 1e-04));
 }
 
@@ -274,61 +275,58 @@ unittest
     assert(unpacked[0][0].length == 3);
 }
 
-private Slice!(ReturnType*, 3) xyz2RgbBgr(bool isBgr, WorkingSpace workingSpace, ReturnType, Iterator)(Slice!(Iterator, 3) input)
+private Slice!(ReturnType*, 3) xyz2RgbBgr(bool isBgr, WorkingSpace workingSpace, ReturnType, T)(Slice!(T, 3) input)
 in
 {
-    import std.traits : isFloatingPoint, isUnsigned;
+    import std.traits : isFloatingPoint;
 
     static assert(isFloatingPoint!ReturnType, "Return type must be floating point.");
     assert(input.shape[2] == 3, "Input requires 3 channels.");
 }
 do
 {
-	import mir.ndslice : each, pack, uninitSlice, zip;
+	import mir.ndslice : each, uninitSlice, zip;
 
     auto output = uninitSlice!ReturnType(input.shape);
-
-	// Much easier to pack before zipping but we lose references in tuples.
-	auto inputOutput = zip!true(input, output).pack!1;
-	
-	inputOutput.each!((io) {io.xyz2RgbBgrImpl!(isBgr, workingSpace);});
-
+    auto inputPack = pixelPack!3(input);
+    auto outputPack = pixelPack!3(output);
+    auto pixelZip = zip(inputPack, outputPack);
+    auto conversionMatrix = mixin(workingSpace ~ "Xyz2Rgb").sliced(3, 3); // TODO: Known at compile-time. Send as template?
+    pixelZip.each!((z) {z.xyz2RgbBgrImpl!(isBgr, workingSpace)(conversionMatrix);});
+    // No need to unpack output. Underlying data has already been changed.
     return output;
 }
 
-void xyz2RgbBgrImpl(bool isBgr, WorkingSpace workingSpace, zipppedType)(zipppedType zipped)
+@fastmath
+void xyz2RgbBgrImpl(bool isBgr, WorkingSpace workingSpace, T, U)(T pixelZip, Slice!(U, 2) conversionMatrix)
 {
 	import kaleidic.lubeck : mtimes;
-	import mir.ndslice : each, reversed;
+	import mir.ndslice : each;
 	
-	auto convMatrix = mixin(workingSpace ~ "Xyz2Rgb").sliced(3, 3);
-	
-	// Forced to use this structure because 1, we can't pack before zipping and keep references
-	// and 2, mtimes does not accept RefTuple members directly.
-	auto input = [zipped[0][0].__value(), zipped[1][0].__value(), zipped[2][0].__value()].sliced(3);
-	
-	auto output = convMatrix.mtimes(input);
-	
-	output.each!((ref chnl) 
-	{
-		if (chnl <= 0.0031308)
-			chnl = chnl * 12.92;
-		else
-			chnl = (1.055 * chnl ^^ (1 / 2.4)) - 0.055;
-	});
-	
-	static if (isBgr)
-	{
-		zipped[0][1].__value() = output[2];
-		zipped[1][1].__value() = output[1];
-		zipped[2][1].__value() = output[0];
-	}
-	else
-	{
-		zipped[0][1].__value() = output[0];
-		zipped[1][1].__value() = output[1];
-		zipped[2][1].__value() = output[2];
-	}
+    // pixelZip[0] = input
+    // pixelZip[1] = output
+
+    // Convert to RGB
+    // TODO: Is manual matrix math faster here?
+    auto output = conversionMatrix.mtimes(sliced(pixelZip[0].ptr, 3));
+
+    // Un-linearize
+    output.each!((ref chnl)
+    {
+        if (chnl <= 0.0031308)
+            chnl = chnl * 12.92;
+        else
+            chnl = (1.055 * chnl ^^ (1 / 2.4)) - 0.055;
+    });
+
+    static if (isBgr)
+    {
+        pixelZip[1][] = [output.field[2], output.field[1], output.field[0]];
+    }
+    else
+    {
+        pixelZip[1][] = output.field;
+    }
 }
 
 /**
