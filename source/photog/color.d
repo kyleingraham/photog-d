@@ -22,6 +22,12 @@ private static immutable
         0.2126729, 0.7151522, 0.0721750,
         0.0193339, 0.1191920, 0.9503041
     ];
+
+    auto sRgbRgb2XyzReverse = [
+        0.1804375, 0.3575761, 0.4124564,
+        0.0721750, 0.7151522, 0.2126729,
+        0.9503041, 0.1191920, 0.0193339,
+    ];
 	
 	auto sRgbXyz2Rgb = [
         3.2404542, -1.5371385, -0.4985314,
@@ -43,7 +49,7 @@ Params:
 Returns:
 	Returns XYZ version of the RGB input image.
 */
-Slice!(ReturnType*, 3) rgb2Xyz(WorkingSpace workingSpace = WorkingSpace.sRgb, ReturnType = double, Iterator)(Slice!(Iterator, 3) input)
+Slice!(ReturnType*, 3) rgb2Xyz(WorkingSpace workingSpace = WorkingSpace.sRgb, ReturnType = double, T)(Slice!(T, 3) input)
 {
     return rgbBgr2Xyz!(false, workingSpace, ReturnType)(input);
 }
@@ -83,7 +89,7 @@ Params:
 Returns:
 	Returns XYZ version of the BGR input image.
 */
-Slice!(ReturnType*, 3) bgr2Xyz(WorkingSpace workingSpace = WorkingSpace.sRgb, ReturnType = double, Iterator)(Slice!(Iterator, 3) input)
+Slice!(ReturnType*, 3) bgr2Xyz(WorkingSpace workingSpace = WorkingSpace.sRgb, ReturnType = double, T)(Slice!(T, 3) input)
 {
     return rgbBgr2Xyz!(true, workingSpace, ReturnType)(input);
 }
@@ -111,7 +117,7 @@ unittest
     assert(approxEqual(bgr.bgr2Xyz, xyz));
 }
 
-private Slice!(ReturnType*, 3) rgbBgr2Xyz(bool isBgr, WorkingSpace workingSpace, ReturnType, Iterator)(Slice!(Iterator, 3) input)
+private Slice!(ReturnType*, 3) rgbBgr2Xyz(bool isBgr, WorkingSpace workingSpace, ReturnType, T)(Slice!(T, 3) input)
 in
 {
     import std.traits : isFloatingPoint;
@@ -121,36 +127,47 @@ in
 }
 do
 {
-	import kaleidic.lubeck : mtimes;
-    import mir.ndslice : as, fuse, map, pack, reversed, uninitSlice;
+    import mir.ndslice : each, uninitSlice, zip;
+
+    auto output = uninitSlice!ReturnType(input.shape);
+    auto inputPack = pixelPack!3(input);
+    auto outputPack = pixelPack!3(output);
+    auto pixelZip = zip(inputPack, outputPack);
 
     static if (isBgr)
-    {
-        auto convMatrix = mixin(workingSpace ~ "Rgb2Xyz").sliced(3, 3).reversed!1;
-    }
+        auto conversionMatrix = mixin(workingSpace ~ "Rgb2XyzReverse").sliced(3, 3);
     else
-    {
-        auto convMatrix = mixin(workingSpace ~ "Rgb2Xyz").sliced(3, 3);
-    }
-	// TODO: Try reshaping to a vector of pixels and then at end restoring shape. Should be easy as pie to compute on.
-    auto output = uninitSlice!ReturnType(input.shape);
+        auto conversionMatrix = mixin(workingSpace ~ "Rgb2Xyz").sliced(3, 3);
 
-    // dfmt off
-    output = input
-        // convert input array elements
-        .as!ReturnType
-        // sRGB inverse compand (linearize with respect to energy)
-        .map!(chnl => chnl <= 0.04045 ? chnl / 12.92 : ((chnl + 0.055) / 1.055) ^^ 2.4)
-        // linear RGB to XYZ
-		// pack the 3rd dimension (last 1 dimensions). mxn slice of 3x1 (pixel) slices.
-		.pack!1
-        // dot product of each pixel with conversion matrix
-        .map!(pixel => convMatrix.mtimes(pixel))
-        // join iterator values into a matrix
-        .fuse;
-    // dfmt on
+    pixelZip.each!((z) {z.rgbBgr2XyzImpl!(isBgr, workingSpace)(conversionMatrix);});
 
     return output;
+}
+
+@fastmath
+void rgbBgr2XyzImpl(bool isBgr, WorkingSpace workingSpace, T, U)(T pixelZip, Slice!(U, 2) conversionMatrix)
+{
+    import kaleidic.lubeck : mtimes;
+    import mir.ndslice : each;
+    
+    // pixelZip[0] = input
+    // pixelZip[1] = output
+
+    auto output = sliced(pixelZip[0].ptr, 3);
+
+    // Linearize
+    output.each!((ref chnl)
+    {
+        if (chnl <= 0.04045)
+            chnl = chnl / 12.92;
+        else
+            chnl = ((chnl + 0.055) / 1.055) ^^ 2.4;
+    });
+
+    // Convert to XYZ
+    output = conversionMatrix.mtimes(output);
+
+    pixelZip[1][] = output.field;
 }
 
 Slice!(ReturnType*, 3) xyz2Rgb(WorkingSpace workingSpace = WorkingSpace.sRgb, ReturnType = double, T)(Slice!(T, 3) input)
