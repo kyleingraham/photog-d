@@ -316,10 +316,9 @@ do
 Chromatically adapt RGB input from the given source illuminant to the 
 given destination illuminant.
 */
-Slice!(Iterator, 3) chromAdapt(ChromAdaptMethod method = ChromAdaptMethod.bradford, Iterator)(
-        Slice!(Iterator, 3) input,
-        double[] srcIlluminant, double[] destIlluminant,
-        WorkingSpace workingSpace = WorkingSpace.sRgb)
+Slice!(Iterator, 3) chromAdapt(ChromAdaptMethod method = ChromAdaptMethod.bradford,
+        WorkingSpace workingSpace = WorkingSpace.sRgb, Iterator)(Slice!(Iterator,
+        3) input, double[] srcIlluminant, double[] destIlluminant)
 in
 {
     import std.traits : isFloatingPoint;
@@ -331,13 +330,12 @@ in
 do
 {
     import kaleidic.lubeck : mtimes;
-    import mir.ndslice : diagonal, reshape, slice;
+    import mir.ndslice : diagonal, each, reshape, slice, uninitSlice, zip;
 
     auto xyz2Lms = mixin(method ~ "Xyz2Lms");
     auto lms2Xyz = mixin(method ~ "InvXyz2Lms");
 
     auto lmsSrc = xyz2Lms.sliced(3, 3).mtimes(srcIlluminant.sliced(3, 1));
-
     auto lmsDest = xyz2Lms.sliced(3, 3).mtimes(destIlluminant.sliced(3, 1));
 
     int err;
@@ -348,7 +346,25 @@ do
 
     auto transform = lms2Xyz.sliced(3, 3).mtimes(lmsGain).mtimes(xyz2Lms.sliced(3, 3));
 
-    return input.rgb2Xyz.pixelMap!(pixel => transform.mtimes(pixel)).xyz2Rgb;
+    auto output = uninitSlice!(IteratorType!Iterator)(input.shape);
+    auto inputPack = pixelPack!3(input.rgb2Xyz!workingSpace);
+    auto outputPack = pixelPack!3(output);
+    auto pixelZip = zip(inputPack, outputPack);
+
+    pixelZip.each!((z) { z.chromAdaptImpl(transform); });
+
+    return output.xyz2Rgb!workingSpace;
+}
+
+private void chromAdaptImpl(T, U)(T pixelZip, Slice!(U, 2) transform)
+{
+    import kaleidic.lubeck : mtimes;
+
+    auto output = sliced(pixelZip[0].ptr, 3);
+
+    output = transform.mtimes(output);
+
+    pixelZip[1][] = output.field;
 }
 
 unittest
