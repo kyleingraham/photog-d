@@ -40,7 +40,7 @@ private static immutable
 }
 
 /**
-Standard illuminants.
+Standard illuminants (XYZ).
 */
 enum Illuminant
 {
