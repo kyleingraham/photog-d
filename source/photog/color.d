@@ -1,6 +1,5 @@
 module photog.color;
 
-import ldc.attributes : fastmath;
 import mir.ndslice : Slice, sliced, SliceKind;
 
 import photog.utils;
@@ -168,8 +167,8 @@ do
     return output;
 }
 
-@fastmath void rgbBgr2XyzImpl(bool isBgr, WorkingSpace workingSpace, T, U)(
-        T pixelZip, Slice!(U, 2) conversionMatrix)
+private void rgbBgr2XyzImpl(bool isBgr, WorkingSpace workingSpace, T, U)(T pixelZip,
+        Slice!(U, 2) conversionMatrix)
 {
     import kaleidic.lubeck : mtimes;
     import mir.ndslice : each;
@@ -281,8 +280,8 @@ do
     return output;
 }
 
-@fastmath void xyz2RgbBgrImpl(bool isBgr, WorkingSpace workingSpace, T, U)(
-        T pixelZip, Slice!(U, 2) conversionMatrix)
+private void xyz2RgbBgrImpl(bool isBgr, WorkingSpace workingSpace, T, U)(T pixelZip,
+        Slice!(U, 2) conversionMatrix)
 {
     import kaleidic.lubeck : mtimes;
     import mir.ndslice : each;
@@ -313,8 +312,23 @@ do
 }
 
 /**
-Chromatically adapt RGB input from the given source illuminant to the 
-given destination illuminant.
+Chromatically adapt RGB input from the given source illuminant to the given destination illuminant.
+
+We employ the von Kries coefficient law for chromatic adaptation. A cone response under a source
+illuminant is converted to one under a destination illuminant via diagonal scaling of the cone
+response components. The output of the chromatic adaptation between a pair of illuminants can be 
+tweaked by chromatic adaption methods which define the conversion to and from XYZ to cone responses
+(LMS).
+
+Params:
+    method = Method to use for chromatic adaptation. Bradford by default.
+    workingSpace = Working space for both the input and the eventual output. sRGB by default.
+    input = RBG image in floating point form.
+    srcIlluminant = XYZ illuminant under which input was recorded.
+    destIlluminant = XYZ illuminant that input should be chromatically adapted to.
+
+Returns:
+    Chromatically adapted floating point RGB image.
 */
 Slice!(Iterator, 3) chromAdapt(ChromAdaptMethod method = ChromAdaptMethod.bradford,
         WorkingSpace workingSpace = WorkingSpace.sRgb, Iterator)(Slice!(Iterator,

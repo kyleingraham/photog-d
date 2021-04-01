@@ -1,6 +1,5 @@
 module photog.utils;
 
-import ldc.attributes : fastmath;
 import mir.ndslice : Slice, sliced, SliceKind;
 
 /**
@@ -168,7 +167,7 @@ do
     return output;
 }
 
-@fastmath private void toUnsignedImpl(T)(T zippedChnls)
+private void toUnsignedImpl(T)(T zippedChnls)
 {
     import std.math : round;
 
@@ -225,7 +224,7 @@ do
     return output;
 }
 
-@fastmath private void toFloatingImpl(T)(T zippedChnls)
+private void toFloatingImpl(T)(T zippedChnls)
 {
     alias UnsignedType = typeof(zippedChnls[0].__value());
     alias FloatingType = typeof(zippedChnls[1].__value());
