@@ -208,21 +208,20 @@ private void toUnsignedImpl(T)(T zippedChnls)
 /**
 Convert unsigned input to floating point.
 */
-Slice!(ReturnType*, 3) toFloating(ReturnType = double, InputType)(InputType[] input,
-        uint width, uint height)
+Slice!(ReturnType*, 3) toFloating(ReturnType = double, Iterator)(Slice!(Iterator, 3) input)
 in
 {
     import std.traits : isFloatingPoint, isUnsigned;
 
     static assert(isFloatingPoint!ReturnType);
-    static assert(isUnsigned!InputType);
+    static assert(isUnsigned!(IteratorType!Iterator));
 }
 do
 {
     import mir.ndslice : each, uninitSlice, zip;
 
-    auto output = uninitSlice!ReturnType([height, width, 3]);
-    auto zipped = zip(input.sliced(height, width, 3), output);
+    auto output = uninitSlice!ReturnType(input.shape);
+    auto zipped = zip(input, output);
     zipped.each!((z) { toFloatingImpl(z); });
 
     return output;
@@ -249,7 +248,7 @@ unittest
     ].sliced(4, 1, 3);
     //dfmt on
 
-    assert(approxEqual(rgb.toFloating(1, 4), rgbDouble));
+    assert(approxEqual(rgb.sliced(4, 1, 3).toFloating, rgbDouble));
 }
 
 private void toFloatingImpl(T)(T zippedChnls)

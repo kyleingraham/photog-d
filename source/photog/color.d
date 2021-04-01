@@ -405,7 +405,7 @@ unittest
         120, 120, 120
     ];
 
-    auto image = uImage.toFloating(1, 4);
+    auto image = uImage.sliced(4, 1, 3).toFloating;
 
     int err;
     double[] srcIlluminant = image
