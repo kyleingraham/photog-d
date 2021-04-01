@@ -20,6 +20,7 @@ do
     return Slice!(ReturnType*, 1, kind)(shape, iterator);
 }
 
+///
 unittest
 {
     // dfmt off
@@ -54,6 +55,7 @@ do
     return Slice!(ReturnType*, 3, kind)(shape, iterator);
 }
 
+///
 unittest
 {
     // dfmt off
@@ -95,7 +97,7 @@ do
 /**
 Grabs iterator type at compile-time.
 */
-package template IteratorType(Iterator)
+template IteratorType(Iterator)
 {
     import std.traits : Unqual;
 
@@ -134,6 +136,7 @@ size_t[] dimensions(T)(T arr, size_t[] dims = [])
     }
 }
 
+///
 unittest
 {
     import mir.ndslice : slice;
@@ -167,15 +170,7 @@ do
     return output;
 }
 
-private void toUnsignedImpl(T)(T zippedChnls)
-{
-    import std.math : round;
-
-    alias UnsignedType = typeof(zippedChnls[1].__value());
-    zippedChnls[1].__value() = cast(UnsignedType) round(zippedChnls[0].__value()
-            .clip!(0, 1) * UnsignedType.max);
-}
-
+///
 unittest
 {
     import std.math : approxEqual;
@@ -201,6 +196,15 @@ unittest
     assert(approxEqual(rgb.toUnsigned, rgbUnsigned));
 }
 
+private void toUnsignedImpl(T)(T zippedChnls)
+{
+    import std.math : round;
+
+    alias UnsignedType = typeof(zippedChnls[1].__value());
+    zippedChnls[1].__value() = cast(UnsignedType) round(zippedChnls[0].__value()
+            .clip!(0, 1) * UnsignedType.max);
+}
+
 /**
 Convert unsigned input to floating point.
 */
@@ -224,13 +228,7 @@ do
     return output;
 }
 
-private void toFloatingImpl(T)(T zippedChnls)
-{
-    alias UnsignedType = typeof(zippedChnls[0].__value());
-    alias FloatingType = typeof(zippedChnls[1].__value());
-    zippedChnls[1].__value() = cast(FloatingType) zippedChnls[0] / UnsignedType.max;
-}
-
+///
 unittest
 {
     import std.math : approxEqual;
@@ -254,6 +252,13 @@ unittest
     assert(approxEqual(rgb.toFloating(1, 4), rgbDouble));
 }
 
+private void toFloatingImpl(T)(T zippedChnls)
+{
+    alias UnsignedType = typeof(zippedChnls[0].__value());
+    alias FloatingType = typeof(zippedChnls[1].__value());
+    zippedChnls[1].__value() = cast(FloatingType) zippedChnls[0] / UnsignedType.max;
+}
+
 /**
 Calculate the mean pixel value for an image.
 
@@ -274,6 +279,7 @@ auto imageMean(T)(Slice!(T, 3) image)
     //dfmt on
 }
 
+///
 unittest
 {
     // dfmt off

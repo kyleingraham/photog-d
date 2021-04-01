@@ -82,6 +82,7 @@ Slice!(ReturnType*, 3) rgb2Xyz(WorkingSpace workingSpace = WorkingSpace.sRgb, Re
     return rgbBgr2Xyz!(false, workingSpace, ReturnType)(input);
 }
 
+///
 unittest
 {
     import std.math : approxEqual;
@@ -114,6 +115,7 @@ Slice!(ReturnType*, 3) bgr2Xyz(WorkingSpace workingSpace = WorkingSpace.sRgb, Re
     return rgbBgr2Xyz!(true, workingSpace, ReturnType)(input);
 }
 
+///
 unittest
 {
     import std.math : approxEqual;
@@ -201,6 +203,7 @@ Slice!(ReturnType*, 3) xyz2Rgb(WorkingSpace workingSpace = WorkingSpace.sRgb, Re
     return xyz2RgbBgr!(false, workingSpace, ReturnType)(input);
 }
 
+///
 unittest
 {
     import std.math : approxEqual;
@@ -233,6 +236,7 @@ Slice!(ReturnType*, 3) xyz2Bgr(WorkingSpace workingSpace = WorkingSpace.sRgb, Re
     return xyz2RgbBgr!(true, workingSpace, ReturnType)(input);
 }
 
+///
 unittest
 {
     import std.math : approxEqual;
@@ -320,6 +324,13 @@ response components. The output of the chromatic adaptation between a pair of il
 tweaked by chromatic adaption methods which define the conversion to and from XYZ to cone responses
 (LMS).
 
+References:
+    http://www.brucelindbloom.com/index.html?Eqn_ChromAdapt.html
+    https://en.wikipedia.org/wiki/Von_Kries_coefficient_law#Chromatic_adaptation
+    https://en.wikipedia.org/wiki/CIE_1931_color_space#Color_matching_functions
+    https://en.wikipedia.org/wiki/LMS_color_space
+    http://scottburns.us/chromatic-adaptation-transform-by-reflectance-reconstruction/
+
 Params:
     method = Method to use for chromatic adaptation. Bradford by default.
     workingSpace = Working space for both the input and the eventual output. sRGB by default.
@@ -381,6 +392,7 @@ private void chromAdaptImpl(T, U)(T pixelZip, Slice!(U, 2) transform)
     pixelZip[1][] = output.field;
 }
 
+///
 unittest
 {
     import mir.ndslice : reshape, slice;
