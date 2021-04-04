@@ -16,7 +16,7 @@ enum WorkingSpace
 /**
 Color space conversion matrices.
 */
-private static immutable
+private static
 {
     
     auto sRgbRgb2Xyz = [
@@ -57,7 +57,7 @@ enum ChromAdaptMethod
 /**
 Chromatic adaptation method matrices.
 */
-private static immutable
+private static
 {
     auto bradfordXyz2Lms = [
         0.8951, 0.2664, -0.1614,
@@ -172,6 +172,8 @@ do
 private void rgbBgr2XyzImpl(bool isBgr, WorkingSpace workingSpace, T, U)(T pixelZip,
         Slice!(U, 2) conversionMatrix)
 {
+    import std.math : exp, log;
+
     import kaleidic.lubeck : mtimes;
     import mir.ndslice : each;
 
@@ -185,7 +187,7 @@ private void rgbBgr2XyzImpl(bool isBgr, WorkingSpace workingSpace, T, U)(T pixel
         if (chnl <= 0.04045)
             chnl = chnl / 12.92;
         else
-            chnl = ((chnl + 0.055) / 1.055) ^^ 2.4;
+            chnl = exp(log((chnl + 0.055) / 1.055) * 2.4);
     });
 
     // Convert to XYZ
@@ -298,11 +300,13 @@ private void xyz2RgbBgrImpl(bool isBgr, WorkingSpace workingSpace, T, U)(T pixel
     auto output = conversionMatrix.mtimes(sliced(pixelZip[0].ptr, 3));
 
     // Un-linearize
+    import std.math : exp, log;
+
     output.each!((ref chnl) {
         if (chnl <= 0.0031308)
             chnl = chnl * 12.92;
         else
-            chnl = (1.055 * chnl ^^ (1 / 2.4)) - 0.055;
+            chnl = (1.055 * exp(log(chnl) * (1 / 2.4))) - 0.055;
     });
 
     static if (isBgr)
