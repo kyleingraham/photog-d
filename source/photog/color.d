@@ -1,5 +1,6 @@
 module photog.color;
 
+import mir.math.common : optmath;
 import mir.ndslice : Slice, sliced, SliceKind;
 
 import photog.utils;
@@ -172,8 +173,6 @@ do
 private void rgbBgr2XyzImpl(bool isBgr, WorkingSpace workingSpace, T, U)(T pixelZip,
         Slice!(U, 2) conversionMatrix)
 {
-    import std.math : exp, log;
-
     import kaleidic.lubeck : mtimes;
     import mir.ndslice : each;
 
@@ -184,16 +183,23 @@ private void rgbBgr2XyzImpl(bool isBgr, WorkingSpace workingSpace, T, U)(T pixel
 
     // Linearize
     output.each!((ref chnl) {
-        if (chnl <= 0.04045)
-            chnl = chnl / 12.92;
-        else
-            chnl = exp(log((chnl + 0.055) / 1.055) * 2.4);
+        chnl.linearize;
     });
 
     // Convert to XYZ
     output = conversionMatrix.mtimes(output);
 
     pixelZip[1][] = output.field;
+}
+
+@optmath private void linearize(T)(ref T chnl)
+{  
+    import mir.math.common : exp, log;
+
+    if (chnl <= 0.04045)
+        chnl = chnl / 12.92;
+    else
+        chnl = exp(log((chnl + 0.055) / 1.055) * 2.4);
 }
 
 /**
@@ -300,13 +306,8 @@ private void xyz2RgbBgrImpl(bool isBgr, WorkingSpace workingSpace, T, U)(T pixel
     auto output = conversionMatrix.mtimes(sliced(pixelZip[0].ptr, 3));
 
     // Un-linearize
-    import std.math : exp, log;
-
     output.each!((ref chnl) {
-        if (chnl <= 0.0031308)
-            chnl = chnl * 12.92;
-        else
-            chnl = (1.055 * exp(log(chnl) * (1 / 2.4))) - 0.055;
+        chnl.unlinearize;
     });
 
     static if (isBgr)
@@ -317,6 +318,16 @@ private void xyz2RgbBgrImpl(bool isBgr, WorkingSpace workingSpace, T, U)(T pixel
     {
         pixelZip[1][] = output.field;
     }
+}
+
+@optmath private void unlinearize(T)(ref T chnl)
+{  
+    import mir.math.common : exp, log;
+
+    if (chnl <= 0.0031308)
+        chnl = chnl * 12.92;
+    else
+        chnl = (1.055 * exp(log(chnl) * (1 / 2.4))) - 0.055;
 }
 
 /**
