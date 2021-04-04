@@ -194,12 +194,12 @@ private void rgbBgr2XyzImpl(bool isBgr, WorkingSpace workingSpace, T, U)(T pixel
 
 @optmath private void linearize(T)(ref T chnl)
 {  
-    import mir.math.common : exp, log;
+    import mir.math.common : pow;
 
     if (chnl <= 0.04045)
         chnl = chnl / 12.92;
     else
-        chnl = exp(log((chnl + 0.055) / 1.055) * 2.4);
+        chnl = pow((chnl + 0.055) / 1.055, 2.4);
 }
 
 /**
@@ -322,12 +322,12 @@ private void xyz2RgbBgrImpl(bool isBgr, WorkingSpace workingSpace, T, U)(T pixel
 
 @optmath private void unlinearize(T)(ref T chnl)
 {  
-    import mir.math.common : exp, log;
+    import mir.math.common : pow;
 
     if (chnl <= 0.0031308)
         chnl = chnl * 12.92;
     else
-        chnl = (1.055 * exp(log(chnl) * (1 / 2.4))) - 0.055;
+        chnl = (1.055 * pow(chnl, (1 / 2.4))) - 0.055;
 }
 
 /**
