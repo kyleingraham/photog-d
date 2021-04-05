@@ -32,3 +32,8 @@ docs/
 
 # Code coverage
 *.lst
+
+# Profiling
+trace.def
+trace.log
+trace.log.dot
