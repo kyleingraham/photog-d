@@ -19,7 +19,6 @@ Color space conversion matrices.
 */
 private static
 {
-    
     auto sRgbRgb2Xyz = [
         0.4124564, 0.3575761, 0.1804375,
         0.2126729, 0.7151522, 0.0721750,
@@ -34,8 +33,8 @@ private static
 	
 	auto sRgbXyz2Rgb = [
         3.2404542, -1.5371385, -0.4985314,
-		-0.9692660, 1.8760108, 0.0415560,
-		0.0556434, -0.2040259, 1.0572252
+        -0.9692660, 1.8760108, 0.0415560,
+        0.0556434, -0.2040259, 1.0572252
     ];
 }
 
@@ -182,9 +181,7 @@ private void rgbBgr2XyzImpl(bool isBgr, WorkingSpace workingSpace, T, U)(T pixel
     auto output = sliced(pixelZip[0].ptr, 3);
 
     // Linearize
-    output.each!((ref chnl) {
-        chnl.linearize;
-    });
+    output.each!((ref chnl) { chnl.linearize; });
 
     // Convert to XYZ
     output = conversionMatrix.mtimes(output);
@@ -193,7 +190,7 @@ private void rgbBgr2XyzImpl(bool isBgr, WorkingSpace workingSpace, T, U)(T pixel
 }
 
 @optmath private void linearize(T)(ref T chnl)
-{  
+{
     import mir.math.common : pow;
 
     if (chnl <= 0.04045)
@@ -306,9 +303,7 @@ private void xyz2RgbBgrImpl(bool isBgr, WorkingSpace workingSpace, T, U)(T pixel
     auto output = conversionMatrix.mtimes(sliced(pixelZip[0].ptr, 3));
 
     // Un-linearize
-    output.each!((ref chnl) {
-        chnl.unlinearize;
-    });
+    output.each!((ref chnl) { chnl.unlinearize; });
 
     static if (isBgr)
     {
@@ -321,7 +316,7 @@ private void xyz2RgbBgrImpl(bool isBgr, WorkingSpace workingSpace, T, U)(T pixel
 }
 
 @optmath private void unlinearize(T)(ref T chnl)
-{  
+{
     import mir.math.common : pow;
 
     if (chnl <= 0.0031308)
